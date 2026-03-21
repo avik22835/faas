@@ -18,8 +18,15 @@ export const deployProcess = async (
 	);
 
 	// Prepare the environment variables
+	const loc = 'C:\\Users\\KIIT0001\\GSOC\\metacall-runtime\\metacall';
 	const envStringified: Record<string, string> = {
-		...(process.env as Record<string, string>)
+		...(process.env as Record<string, string>),
+		CORE_ROOT: `${loc}\\runtimes\\dotnet\\shared\\Microsoft.NETCore.App\\5.0.12`,
+		LOADER_LIBRARY_PATH: `${loc}\\lib`,
+		SERIAL_LIBRARY_PATH: `${loc}\\lib`,
+		DETOUR_LIBRARY_PATH: `${loc}\\lib`,
+		PORT_LIBRARY_PATH: `${loc}\\lib`,
+		CONFIGURATION_PATH: `${loc}\\configurations\\global.json`
 	};
 
 	// Ensure all values are explicitly cast to string to prevent TypeError in spawn
@@ -29,10 +36,30 @@ export const deployProcess = async (
 		}
 	}
 
-	const proc = spawn('metacall', [desiredPath], {
-		stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-		cwd: resource.path, // Current working directory resolution
-		env: envStringified // Environment variable injection
+	fs.appendFileSync(
+		'spawn_debug.log',
+		`Spawning node with worker: ${desiredPath}\n`
+	);
+	fs.appendFileSync('spawn_debug.log', `CWD: ${resource.path}\n`);
+
+	let proc;
+	try {
+		proc = spawn('node', [desiredPath], {
+			stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+			cwd: resource.path,
+			env: envStringified
+		});
+	} catch (e) {
+		fs.appendFileSync('spawn_debug.log', `SPAWN THREW: ${e.message}\n`);
+		throw e;
+	}
+
+	proc.on('error', (err: Error) => {
+		fs.appendFileSync(
+			'spawn_debug.log',
+			`PROC ERROR EVENT: ${err.message}\n`
+		);
+		console.error('FAILED TO SPAWN:', err);
 	});
 
 	// Send load message with the deploy information

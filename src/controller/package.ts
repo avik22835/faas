@@ -67,6 +67,10 @@ export const packageUpload = (
 		next(error);
 	};
 
+	bb.on('error', (err: Error) => {
+		errorHandler(new AppError(`Busboy error: ${err.message}`, 400));
+	});
+
 	const eventHandler = <T>(type: keyof busboy.BusboyEvents, listener: T) => {
 		bb.on(type, (...args: unknown[]) => {
 			try {
@@ -86,13 +90,18 @@ export const packageUpload = (
 			info: { encoding: string; filename: string; mimeType: string }
 		) => {
 			const { mimeType, filename } = info;
+			console.log(`Received file: ${filename}, mimeType: ${mimeType}`);
 
 			if (
 				mimeType !== 'application/x-zip-compressed' &&
-				mimeType !== 'application/zip'
+				mimeType !== 'application/zip' &&
+				mimeType !== 'application/octet-stream'
 			) {
 				return errorHandler(
-					new AppError('Please upload a zip file', 404)
+					new AppError(
+						`Please upload a zip file (received ${mimeType})`,
+						404
+					)
 				);
 			}
 
@@ -118,9 +127,26 @@ export const packageUpload = (
 					ensureFolderExists(appLocation)
 						.then(() => {
 							// Create the write stream for storing the blob
-							file.pipe(
-								fs.createWriteStream(resource.blob as string)
-							).on('finish', () => {
+							const writeStream = fs.createWriteStream(
+								resource.blob as string
+							);
+							file.on('error', (err: Error) => {
+								errorHandler(
+									new AppError(
+										`File stream error: ${err.message}`,
+										400
+									)
+								);
+							});
+							writeStream.on('error', (err: Error) => {
+								errorHandler(
+									new AppError(
+										`Write stream error: ${err.message}`,
+										500
+									)
+								);
+							});
+							file.pipe(writeStream).on('finish', () => {
 								fileResolve();
 							});
 						})

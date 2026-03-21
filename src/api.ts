@@ -23,6 +23,11 @@ export function initializeAPI(): Express {
 	const app = express();
 	const host = hostname();
 
+	app.use((req, _res, next) => {
+		fs.appendFileSync('request.log', `${req.method} ${req.url}\n`);
+		next();
+	});
+
 	app.use(express.json());
 	app.use(express.urlencoded({ extended: true }));
 
@@ -50,6 +55,8 @@ export function initializeAPI(): Express {
 	app.post('/api/deploy/delete', deployDelete);
 
 	app.get('/api/inspect', inspect);
+	app.get('/api/v1/inspect', inspect);
+	app.get('/api/v1/inspect', inspect);
 
 	app.get(
 		'/api/billing/list-subscriptions',

@@ -1,0 +1,87 @@
+name: Surgical Zero-Trust Integration (FaaS)
+
+on:
+  repository_dispatch:
+    types: [protocol_release]
+  workflow_dispatch:
+    inputs:
+      artifact_url:
+        description: 'URL to the .tgz protocol artifact'
+        required: false
+
+jobs:
+  faas-integration-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Trusted Baseline (Main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Base Dependencies
+        run: npm ci
+
+      - name: Download Protocol Artifact
+        run: |
+          ARTIFACT_URL="${{ github.event.client_payload.artifact_url || github.event.inputs.artifact_url }}"
+          if [ ! -z "$ARTIFACT_URL" ]; then
+            # Note: GitHub artifacts are zipped; we'd need to unzip first in a real run
+            curl -L "$ARTIFACT_URL" -o protocol-artifact.tgz
+            echo "HAS_ARTIFACT=true" >> $GITHUB_ENV
+          fi
+
+      - name: Surgical Injection
+        run: |
+          if [ "$HAS_ARTIFACT" = "true" ]; then
+            npx ts-node scripts/surgical_engine.ts --apply --artifact=protocol-artifact.tgz
+          fi
+
+      - name: Start Auth Proxy (The Vault)
+        env:
+          METACALL_API_KEY: ${{ secrets.METACALL_API_KEY }}
+        run: |
+          npx ts-node scripts/auth_proxy.ts &
+          echo "PROXY_PID=$!" >> $GITHUB_ENV
+          sleep 5 # Wait for proxy to start
+
+      - name: Run Zero-Trust Integration Tests (FaaS test.sh)
+        env:
+          METACALL_API_URL: http://localhost:8080
+        run: |
+          # Use the redirected URL for the legacy tests
+          chmod +x test.sh
+          ./test.sh
+
+      - name: Atomic Rollback (Self-Healing)
+        if: always()
+        run: |
+          npx ts-node scripts/surgical_engine.ts --rollback
+          if [ ! -z "$PROXY_PID" ]; then
+            kill $PROXY_PID
+          fi
+
+      - name: Report Results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
+            const prNumber = context.payload.client_payload?.pr_number;
+            if (prNumber) {
+              github.rest.issues.createComment({
+                owner: 'metacall',
+                repo: 'protocol',
+                issue_number: parseInt(prNumber),
+                body: `${status} **Surgical Integration Test Result**\nRepo: faas\nStatus: ${status}\n[View Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              });
+            }

@@ -111,6 +111,8 @@ const handleDeployment = async (resource: Resource): Promise<Deployment> => {
 	return deployment;
 };
 
+import * as fs_sync from 'fs';
+
 process.on('message', (payload: WorkerMessageUnknown) => {
 	switch (payload.type) {
 		// Handle deploy load
@@ -126,7 +128,10 @@ process.on('message', (payload: WorkerMessageUnknown) => {
 					}
 				})
 				.catch(err => {
-					console.log(err);
+					fs_sync.appendFileSync(
+						'worker_crash.log',
+						`Worker Error: ${err.stack}\n`
+					);
 					process.exit(1);
 				});
 			break;

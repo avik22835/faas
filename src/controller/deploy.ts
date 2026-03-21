@@ -25,6 +25,10 @@ export const deploy = catchAsync(
 		res: Response,
 		next: NextFunction
 	) => {
+		fs.appendFileSync(
+			'deploy_entry.log',
+			`Deploy called for: ${req.body.suffix}\n`
+		);
 		try {
 			const application = Applications[req.body.suffix];
 

@@ -9,6 +9,20 @@ import { autoDeployApps } from './utils/autoDeploy';
 import { appsDirectory } from './utils/config';
 import { ensureFolderExists } from './utils/filesystem';
 import { printVersionAndExit } from './utils/version';
+import * as fs_sync from 'fs';
+
+process.on('uncaughtException', err => {
+	fs_sync.appendFileSync('crash.log', `Uncaught Exception: ${err.stack}\n`);
+	process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+	fs_sync.appendFileSync(
+		'crash.log',
+		`Unhandled Rejection at: ${promise}, reason: ${reason}\n`
+	);
+	process.exit(1);
+});
 
 // Initialize the FaaS
 void (async (): Promise<void> => {
