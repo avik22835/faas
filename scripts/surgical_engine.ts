@@ -199,8 +199,8 @@ const args = process.argv.slice(2);
 const engine = new SurgicalEngine();
 
 if (args.includes('--apply')) {
-    const diffFile = args.find(a => a.startsWith('--diff='))?.split('=')[1];
-    const artifactFile = args.find(a => a.startsWith('--artifact='))?.split('=')[1];
+    const diffFile = args.find((a: string) => a.startsWith('--diff='))?.split('=')[1];
+    const artifactFile = args.find((a: string) => a.startsWith('--artifact='))?.split('=')[1];
 
     try {
         if (artifactFile) {
