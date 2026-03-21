@@ -42,14 +42,14 @@ jobs:
       - name: Surgical Injection
         run: |
           if [ "$HAS_ARTIFACT" = "true" ]; then
-            npx ts-node scripts/surgical_engine.ts --apply --artifact=protocol-artifact.tgz
+            npx ts-node --transpile-only --skip-project scripts/surgical_engine.ts --apply --artifact=protocol-artifact.tgz
           fi
 
       - name: Start Auth Proxy (The Vault)
         env:
           METACALL_API_KEY: ${{ secrets.METACALL_API_KEY }}
         run: |
-          npx ts-node scripts/auth_proxy.ts &
+          npx ts-node --transpile-only --skip-project scripts/auth_proxy.ts &
           echo "PROXY_PID=$!" >> $GITHUB_ENV
           sleep 5 # Wait for proxy to start
 
@@ -63,7 +63,7 @@ jobs:
       - name: Atomic Rollback (Self-Healing)
         if: always()
         run: |
-          npx ts-node scripts/surgical_engine.ts --rollback
+          npx ts-node --transpile-only --skip-project scripts/surgical_engine.ts --rollback
           if [ ! -z "$PROXY_PID" ]; then
             kill $PROXY_PID
           fi
