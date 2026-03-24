@@ -32,11 +32,11 @@ jobs:
           # 1. Install from GitHub
           npm install "github:$OWNER/protocol#$BRANCH" --ignore-scripts --no-package-lock
           
-          # 2. BUILD the injected protocol
+          # 2. BUILD the injected protocol (Bypassing broken library types)
           echo "[Surgical Engine] Building injected protocol..."
           cd node_modules/@metacall/protocol
           npm install --ignore-scripts
-          npx tsc
+          npx tsc --skipLibCheck --declaration false
           echo "[Surgical Engine] Protocol build complete."
 
       - name: Start Auth Proxy (The Vault)
