@@ -32,7 +32,7 @@ jobs:
           # 1. Install from GitHub
           npm install "github:$OWNER/protocol#$BRANCH" --ignore-scripts --no-package-lock
           
-          # 2. BUILD the injected protocol (Bypassing broken library types)
+          # 2. BUILD the injected protocol
           echo "[Surgical Engine] Building injected protocol..."
           cd node_modules/@metacall/protocol
           npm install --ignore-scripts
@@ -46,12 +46,11 @@ jobs:
           node scripts/auth_proxy.js &
           sleep 5
 
-      - name: Run Zero-Trust Integration Tests (FaaS test.sh)
+      - name: Run Zero-Trust Integration Tests (FaaS Verify)
         env:
           METACALL_API_URL: http://localhost:8080
         run: |
-          chmod +x test.sh
-          ./test.sh || echo "Bash tests failed but continuing for demo..."
+          node scripts/verify_pipeline.js
 
       - name: Report Results
         if: always()
@@ -66,6 +65,6 @@ jobs:
                 owner: context.repo.owner,
                 repo: 'protocol',
                 issue_number: parseInt(prNumber),
-                body: `### Surgical Integration Report (FaaS)\n- **Status**: ${status}\n- **Security**: Zero-Trust Vault Active\n- **Sanitization**: Applied\n[View Detailed Logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+                body: `### Surgical Integration Report (FaaS)\n- **Status**: ${status}\n- **Attack Log Proof**: Check the logs for 'HACKER LOG'.\n[View Detailed Logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
               });
             }
