@@ -21,13 +21,14 @@ jobs:
 
       - name: Surgical Environment Repair
         run: |
-          # 1. Remove the broken local dependency
+          # Force Git to use HTTPS instead of SSH globally
+          git config --global url."https://github.com/".insteadOf ssh://git@github.com/
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          
+          # Physically delete the broken dependency from the host package.json
           sed -i '/metacall-runtime/d' package.json
-          
-          # 2. DELETE the lockfile to prevent 'extraneous' errors in Docker
           rm -f package-lock.json
-          
-          echo "[Surgical Engine] Environment purged of broken dependencies."
+          echo "[Surgical Engine] Environment repaired and forced to HTTPS."
 
       - name: Install Base Dependencies
         run: |
@@ -37,10 +38,12 @@ jobs:
         run: |
           OWNER="${{ github.event.client_payload.owner }}"
           BRANCH="${{ github.event.client_payload.protocol_branch }}"
-          echo "[Surgical Engine] Injecting Protocol from $OWNER/$BRANCH"
-          npm install "github:$OWNER/protocol#$BRANCH" --ignore-scripts --no-package-lock
+          echo "[Surgical Engine] Injecting Protocol from $OWNER/$BRANCH via HTTPS"
           
-          echo "[Surgical Engine] Building injected protocol..."
+          # Force HTTPS URL to avoid SSH errors in Docker
+          npm install "https://github.com/$OWNER/protocol.git#$BRANCH" --ignore-scripts --no-package-lock
+          
+          # BUILD the injected protocol
           cd node_modules/@metacall/protocol
           npm install --ignore-scripts
           npx tsc --skipLibCheck --declaration false
@@ -55,12 +58,13 @@ jobs:
       - name: Neutralization Proof (Security Demo)
         continue-on-error: true 
         run: |
+          echo "[Verify] Proving the attack is neutralized (Expect 401/404)..."
           node scripts/verify_pipeline.js
 
       - name: Run Real FaaS Test Suite (Local Docker)
         run: |
           chmod +x test.sh
-          # Docker will now build successfully because package-lock.json is gone
+          # This finally runs the ACTUAL FaaS integration tests
           ./test.sh
 
       - name: Report Results
