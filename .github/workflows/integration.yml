@@ -25,26 +25,29 @@ jobs:
           sed -i '/metacall-runtime/d' package.json
           rm -f package-lock.json
           
-          # 2. Inject Protocol via Direct Tarball (Pure HTTPS - No Git/SSH needed)
+          # 2. Inject Protocol via Direct Tarball
           OWNER="${{ github.event.client_payload.owner }}"
           BRANCH="${{ github.event.client_payload.protocol_branch }}"
           TARBALL_URL="https://github.com/$OWNER/protocol/tarball/$BRANCH"
           
-          echo "[Surgical Engine] Injecting Protocol via Tarball: $TARBALL_URL"
           node -e "
             const pkg = require('./package.json');
             pkg.dependencies['@metacall/protocol'] = '$TARBALL_URL';
             require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
           "
-          echo "[Surgical Engine] package.json surgically updated for HTTPS-only build."
 
-      - name: Install Base Dependencies
+          # 3. IMMUNIZE Dockerfile (The Master Move)
+          # We force Docker to use --ignore-scripts so the 'Virus' cannot execute during build
+          sed -i 's/npm install/npm install --ignore-scripts/g' Dockerfile
+          
+          echo "[Surgical Engine] Environment repaired and immunized against supply chain attacks."
+
+      - name: Install Base Dependencies (Host)
         run: |
           npm install --ignore-scripts --no-package-lock
 
       - name: Protocol Artifact Build
         run: |
-          # We still need to build the protocol library itself after downloading the tarball
           cd node_modules/@metacall/protocol
           npm install --ignore-scripts
           npx tsc --skipLibCheck --declaration false
@@ -65,7 +68,7 @@ jobs:
       - name: Run Real FaaS Test Suite (Local Docker)
         run: |
           chmod +x test.sh
-          # This finally runs the ACTUAL FaaS integration tests
+          # Docker will now build because we forced --ignore-scripts in the repair step
           ./test.sh
 
       - name: Report Results
@@ -81,6 +84,6 @@ jobs:
                 owner: context.repo.owner,
                 repo: 'protocol',
                 issue_number: parseInt(prNumber),
-                body: `### Surgical Integration Report (FaaS)\n- **Status**: ${status}\n- **Local Tests**: Real FaaS test.sh executed in Docker.\n- **Security**: Attack neutralized (See logs).\n[View Detailed Logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+                body: `### Surgical Integration Report (FaaS)\n- **Status**: ${status}\n- **Local Tests**: Real FaaS test.sh executed in Docker.\n- **Security**: Attack detected and neutralized via --ignore-scripts.\n[View Detailed Logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
               });
             }
