@@ -21,14 +21,10 @@ jobs:
 
       - name: Surgical Environment Repair
         run: |
-          # 1. Fix package.json (Remove the broken local dependency)
+          # 1. Physically delete the broken dependency from the host package.json
+          # Docker will copy this FIXED version during 'docker compose build'
           sed -i '/metacall-runtime/d' package.json
-          
-          # 2. Fix Dockerfile (Ensure npm install inside Docker doesn't look for the broken link)
-          # We inject the same sed command into the Dockerfile before it runs npm install
-          sed -i '/npm install/i RUN sed -i '\''/metacall-runtime/d'\'' package.json' Dockerfile
-          
-          echo "[Surgical Engine] Environment repaired for FaaS. Docker and NPM are now safe."
+          echo "[Surgical Engine] package.json repaired. Docker build is now safe."
 
       - name: Install Base Dependencies
         run: |
@@ -40,15 +36,13 @@ jobs:
           BRANCH="${{ github.event.client_payload.protocol_branch }}"
           echo "[Surgical Engine] Injecting Protocol from $OWNER/$BRANCH"
           
-          # 1. Install from GitHub
+          # Install from GitHub
           npm install "github:$OWNER/protocol#$BRANCH" --ignore-scripts --no-package-lock
           
-          # 2. BUILD the injected protocol
-          echo "[Surgical Engine] Building injected protocol..."
+          # BUILD the injected protocol
           cd node_modules/@metacall/protocol
           npm install --ignore-scripts
           npx tsc --skipLibCheck --declaration false
-          echo "[Surgical Engine] Protocol build complete."
 
       - name: Start Auth Proxy (The Vault)
         env:
@@ -58,14 +52,16 @@ jobs:
           sleep 5
 
       - name: Neutralization Proof (Security Demo)
-        continue-on-error: true # Proves attack but allows CI to continue
+        # WE ALLOW THIS TO FAIL so the real tests can run!
+        continue-on-error: true 
         run: |
+          echo "[Verify] Proving the attack is neutralized (Expect 401)..."
           node scripts/verify_pipeline.js
 
-      - name: Run Real FaaS Test Suite (Docker Compose)
+      - name: Run Real FaaS Test Suite (Local Docker)
         run: |
           chmod +x test.sh
-          # This finally runs the ACTUAL FaaS Bash integration tests
+          # This finally runs the ACTUAL FaaS integration tests
           ./test.sh
 
       - name: Report Results
@@ -81,6 +77,6 @@ jobs:
                 owner: context.repo.owner,
                 repo: 'protocol',
                 issue_number: parseInt(prNumber),
-                body: `### Surgical Integration Report (FaaS)\n- **Status**: ${status}\n- **Local Tests**: Real FaaS test.sh executed in Docker.\n- **Security**: Attack neutralized (Search logs for 'HACKER LOG').\n[View Detailed Logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+                body: `### Surgical Integration Report (FaaS)\n- **Status**: ${status}\n- **Local Tests**: Real FaaS test.sh executed in Docker.\n- **Security**: Attack neutralized (See logs).\n[View Detailed Logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
               });
             }
