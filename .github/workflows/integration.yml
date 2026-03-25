@@ -21,29 +21,30 @@ jobs:
 
       - name: Surgical Environment Repair
         run: |
-          # Force Git to use HTTPS instead of SSH globally
-          git config --global url."https://github.com/".insteadOf ssh://git@github.com/
-          git config --global url."https://github.com/".insteadOf git@github.com:
-          
-          # Physically delete the broken dependency from the host package.json
+          # 1. Physically delete broken dependencies from package.json
           sed -i '/metacall-runtime/d' package.json
           rm -f package-lock.json
-          echo "[Surgical Engine] Environment repaired and forced to HTTPS."
+          
+          # 2. Inject Protocol via Direct Tarball (Pure HTTPS - No Git/SSH needed)
+          OWNER="${{ github.event.client_payload.owner }}"
+          BRANCH="${{ github.event.client_payload.protocol_branch }}"
+          TARBALL_URL="https://github.com/$OWNER/protocol/tarball/$BRANCH"
+          
+          echo "[Surgical Engine] Injecting Protocol via Tarball: $TARBALL_URL"
+          node -e "
+            const pkg = require('./package.json');
+            pkg.dependencies['@metacall/protocol'] = '$TARBALL_URL';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          echo "[Surgical Engine] package.json surgically updated for HTTPS-only build."
 
       - name: Install Base Dependencies
         run: |
           npm install --ignore-scripts --no-package-lock
 
-      - name: Surgical Protocol Injection
+      - name: Protocol Artifact Build
         run: |
-          OWNER="${{ github.event.client_payload.owner }}"
-          BRANCH="${{ github.event.client_payload.protocol_branch }}"
-          echo "[Surgical Engine] Injecting Protocol from $OWNER/$BRANCH via HTTPS"
-          
-          # Force HTTPS URL to avoid SSH errors in Docker
-          npm install "https://github.com/$OWNER/protocol.git#$BRANCH" --ignore-scripts --no-package-lock
-          
-          # BUILD the injected protocol
+          # We still need to build the protocol library itself after downloading the tarball
           cd node_modules/@metacall/protocol
           npm install --ignore-scripts
           npx tsc --skipLibCheck --declaration false
