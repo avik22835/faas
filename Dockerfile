@@ -21,7 +21,10 @@
 FROM --platform=linux/amd64 node:20-bookworm-slim AS base
 
 # Install git so npm can handle GitHub dependencies
-RUN apt-get update && apt-get install -y git --no-install-recommends && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git --no-install-recommends && \
+    git config --global url."https://github.com/".insteadOf ssh://git@github.com/ && \
+    git config --global url."https://github.com/".insteadOf git@github.com: && \
+    rm -rf /var/lib/apt/lists/*
 
 # Image descriptor
 LABEL copyright.name="Vicente Eduardo Ferrer Garcia" \
